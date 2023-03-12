@@ -15,7 +15,7 @@
             <template #secondState>Выключить распознавание</template>
           </MainButton>
         </nav>
-        <audio ref="alarm" loop src='/public/alarm.mp3'></audio>
+        <audio ref="alarm" loop src='/alarm.mp3'></audio>
       </div>
 
 <!--      <EmailSender ref="sender"></EmailSender>-->
@@ -147,7 +147,7 @@ function downloadVideo(chunk, name) {
 }
 async function loadDetector() {
   console.log('Loading...');
-  detector.value = new Worker('/public/detect.js');
+  detector.value = new Worker('/detect.js');
   await new Promise((resolve, reject) => {
     detector.value.onmessage = (_) => resolve()
   });
