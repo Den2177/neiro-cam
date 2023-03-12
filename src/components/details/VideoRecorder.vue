@@ -15,7 +15,7 @@
             <template #secondState>Выключить распознавание</template>
           </MainButton>
         </nav>
-        <audio ref="alarm" loop src='./alarm.mp3'></audio>
+        <audio ref="alarm" loop src='/src/assets/alarm.mp3'></audio>
       </div>
 
 <!--      <EmailSender ref="sender"></EmailSender>-->
