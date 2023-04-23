@@ -7,8 +7,6 @@
           <canvas ref="canvas" class="canvas" width="640" height="480"></canvas>
           <canvas id="bbox" ref="bbox" width="640" height="480"></canvas>
         </div>
-
-
         <nav class="buttons">
           <MainButton @on="onDetect" @off="offDetect">
             <template #firstState>Включить распознавание</template>
@@ -17,9 +15,6 @@
         </nav>
         <audio ref="alarm" loop src='/alarm.mp3'></audio>
       </div>
-
-<!--      <EmailSender ref="sender"></EmailSender>-->
-      <a ref="a" href="#" class="link" id="link">link</a>
     </div>
   </main>
 </template>
@@ -29,14 +24,15 @@
 import {computed, onMounted, ref} from "vue";
 import MainButton from "../buttons/MainButton.vue";
 import {CHUNK_DURATION} from "@/consts";
-import EmailSender from "./EmailSender.vue";
+import {read, utils, write} from "xlsx";
+import {downloadFile} from "@/utils";
+import {makeExcelFileByData} from "../../utils";
 
 const video = ref(null);
 const canvas = ref(null);
 const bbox = ref(null);
 const alarm = ref(null);
 const sender = ref(null);
-const a = ref(null);
 
 const stream = ref({});
 const sizes = ref({});
@@ -60,6 +56,28 @@ const capture = computed(() => {
 onMounted(() => {
   init();
 });
+
+function downloadReport(name, chunk) {
+  const date = new Date(Date.now());
+  const timeString = date.toLocaleTimeString('ru');
+  const dateString = date.toLocaleDateString('ru');
+  const isAfterVideoState = /after/.test(name);
+  const data = [
+    ['Название: ', name],
+    ['Дата выхода сотрдуника из кадра: ', dateString],
+    ['Время выхода сотрудника из кадра: ', timeString],
+  ];
+
+  data.push(
+      [
+        'Состояние в видео: ',
+        isAfterVideoState ? 'Сотрудник покинул рабочее место' : 'Сотрудник в процессе покидания рабочего места',
+      ]
+  );
+
+  const blob = makeExcelFileByData(data);
+  downloadFile(blob, 'xlsx');
+}
 
 async function init() {
   await getUserMedia();
@@ -86,10 +104,7 @@ async function getUserMedia() {
 function addListeners() {
   recorder.value.rec.ondataavailable = (ev) => {
     chunk.value = ev.data;
-
-    if (detected.value) {
-
-    } else if (recorder.value.num > 0) {
+    if (recorder.value.num > 0 && !detected.value && isDetecting.value) {
       sendChunk();
       recorder.value.num--;
     }
@@ -124,29 +139,33 @@ async function grabVideo() {
     alarm.value.pause();
     stopDetect();
   }
-
 }
+
 function playAlarm() {
   if (!isDetecting.value) {
     alarm.value.play();
   }
 }
+
 async function sendChunk() {
   if (chunk.value !== null && chunk.value.size > 0) {
     const type = recorder.value.num === 0 ? 'before' : recorder.value.num === 2 ? 'during' : 'after';
-    const date = new Date().toISOString().replace(/:/g, '.').replace(/T/g, ', ').slice(0, -5);
-    const name = '__' + date + ', ' + type + '.webm';
-    /*await sender.value.send(type, name, chunk.value.slice());*/
-    downloadVideo(chunk, name);
+    const name = Date.now() + ' - ' + type + '.webm';
+    await downloadVideo(chunk.value.slice(), name);
   }
 }
+
 function downloadVideo(chunk, name) {
-  a.value.href = URL.createObjectURL(chunk.value);
-  a.value.download = name;
-  a.value.click();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(chunk);
+  a.download = name;
+  a.click();
+  a.remove();
+
+  downloadReport(name, chunk);
 }
+
 async function loadDetector() {
-  console.log('Loading...');
   detector.value = new Worker('/detect.js');
   await new Promise((resolve, reject) => {
     detector.value.onmessage = (_) => resolve()
@@ -191,6 +210,7 @@ function stopDetect() {
 function offAlarm() {
   alarm.value.pause();
 }
+
 function onAlarm() {
   alarm.value.play();
 }
@@ -215,6 +235,7 @@ function onAlarm() {
   flex-direction: column;
   margin: 100px auto 0 auto;
 }
+
 #video {
   border-radius: 8px;
 }
@@ -222,10 +243,12 @@ function onAlarm() {
 .canvas {
   display: none;
 }
+
 .wrapper {
 
   position: relative;
 }
+
 #bbox {
   position: absolute;
   top: 0;
